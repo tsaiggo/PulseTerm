@@ -1024,3 +1024,134 @@ public static string FormatSize(long bytes)
 ### Stashed Broken Files
 - Pre-existing broken test files (`SessionTreeViewModelTests.cs`, `TerminalTabViewModelTests.cs`) that used old `RxApp` API were moved to `/tmp/pulseterm_stash/` to unblock build
 
+## [2026-03-05] Task 20: Light Theme Verification
+
+### Test Results
+- **Tests Created**: 9 theme switching tests
+- **Tests Passed**: 9/9 (100%)
+- **Build**: `dotnet build src/PulseTerm.slnx --warnaserror` → 0 warnings, 0 errors
+
+### LightTheme.axaml Verification
+- **Token count**: 24 keys (23 color + 1 font) — exact parity with DarkTheme.axaml
+- **All 23 color token keys match** between Dark and Light themes
+- **Categories**: 7 background, 3 accent, 4 text, 2 border, 3 status, 3 semantic, 1 tab
+
+### WCAG AA Contrast Ratios (against #FFFFFF background)
+
+| Token | Color | Ratio | Required | Pass |
+|-------|-------|-------|----------|------|
+| PulseTextPrimary | #24292F | 14.65:1 | 4.5:1 | ✅ |
+| PulseTextSecondary | #57606A | 6.39:1 | 4.5:1 | ✅ |
+| PulseTextTertiary | #6E7781 | 4.55:1 | 4.5:1 | ✅ |
+| PulseTextMuted | #8C959F | 3.04:1 | 3.0:1 | ✅ |
+| PulseAccentText | #008568 | 4.61:1 | 4.5:1 | ✅ |
+| PulseStatusConnected | #00A88A | 3.01:1 | 3.0:1 | ✅ |
+| PulseStatusConnecting | #BF8700 | 3.14:1 | 3.0:1 | ✅ |
+| PulseStatusDisconnected | #CF222E | 5.36:1 | 3.0:1 | ✅ |
+
+### Fix Applied
+- **PulseAccentText**: Changed from `#00876E` (4.48:1 — FAIL) to `#008568` (4.61:1 — PASS)
+- Minimal color shift to meet WCAG AA 4.5:1 requirement for normal text
+- Same hue family (teal-green), just slightly darker
+
+### App.axaml ThemeDictionaries Wiring
+- `ThemeDictionaries` has both `Dark` and `Light` keys
+- `ResourceInclude Source="/Themes/DarkTheme.axaml"` and `"/Themes/LightTheme.axaml"`
+- `App.axaml.cs` `ApplyThemeVariant()` maps `"light"` → `ThemeVariant.Light`, default → `ThemeVariant.Dark`
+- `ThemeService.ThemeChanged` event subscribed in `App.Initialize()`
+
+### ThemeService Test Coverage (9 tests)
+1. SetTheme("light") changes CurrentTheme
+2. SetTheme("light") fires ThemeChanged event
+3. SetTheme("dark") switches back from light
+4. Same theme does NOT fire event (idempotent)
+5. Invalid theme throws ArgumentException
+6. Case-insensitive ("Light" → "light")
+7. Constructor defaults (dark, light both valid)
+8. Constructor with invalid theme defaults to "dark"
+9. Round-trip dark→light→dark→light fires all events
+
+### Pre-existing Issue Fixed
+- `StatusBarViewModelTests.cs` used `Microsoft.Reactive.Testing` (for `TestScheduler`)
+  but the package was missing from `PulseTerm.App.Tests.csproj`
+- Added `Microsoft.Reactive.Testing 6.0.1` to fix pre-existing build failure
+
+## [2026-03-05] Task 19: Status Bar
+
+### Test Results
+- **Tests Created**: 9 (requirement: 4+)
+- **Tests Passed**: 9/9 (100%)
+- **Build**: `dotnet build src/PulseTerm.slnx --warnaserror` → 0 warnings, 0 errors
+
+### Implementation Summary
+- Expanded `StatusBarViewModel` with 7 new reactive properties: Status, Latency, TerminalType, WindowSize, Encoding, Uptime, IsConnected
+- Added uptime timer using `Observable.Interval` with injectable `IScheduler` for testability
+- Implemented `IDisposable` with `CompositeDisposable` for proper cleanup
+- Enhanced MainWindow.axaml status bar with 3-section layout: Left (connection+status dot+latency), Center (terminal type+window size), Right (encoding+uptime)
+
+### Uptime Timer Pattern
+```csharp
+_uptimeSubscription = Observable
+    .Interval(TimeSpan.FromSeconds(1), _scheduler)
+    .Subscribe(_ =>
+    {
+        var elapsed = _scheduler.Now - _uptimeStart;
+        Uptime = elapsed.ToString(@"hh\:mm\:ss");
+    });
+```
+
+### Status Dot Visibility
+- Used `StringConverters.IsNotNullOrEmpty` (Avalonia built-in) for conditional visibility of status dot, latency, and uptime
+- Status dot uses `Ellipse` with `PulseStatusDisconnected` default fill
+
+### Unicode in C# Source
+- Window size uses `\u00D7` (multiplication sign ×) in string literals: `"80\u00D724"`
+
+## [2026-03-05] Task 21: Keyboard Shortcuts + Terminal Copy/Paste
+
+### Test Results
+- **Tests Created**: 16 (requirement: 6+)
+- **Tests Passed**: 16/16 (100%)
+- **Test Filter**: `dotnet test --filter "Category=Keyboard"` → all pass
+- **Build**: `dotnet build src/PulseTerm.App --warnaserror` → 0 warnings, 0 errors
+
+### KeyboardShortcutService Architecture
+- **Pure C# class** — zero Avalonia dependencies, fully unit-testable
+- Constructor takes `bool isMacOS` (defaults to `RuntimeInformation.IsOSPlatform(OSPlatform.OSX)`)
+- `Dictionary<(KeyModifiers, KeyCode, ShortcutContext), ShortcutAction>` for O(1) lookup
+- Terminal context falls back to Global mappings (e.g., Ctrl+T works in terminal too)
+
+### Platform-Specific Shortcut Mapping
+- **macOS**: Cmd (Meta) replaces Ctrl for Copy/Paste/NewTab/CloseTab/Settings
+- **macOS terminal**: Cmd+C = Copy (not SIGINT), Ctrl+C = 0x03 byte (SIGINT)
+- **Win/Linux terminal**: Ctrl+Shift+C = Copy, Ctrl+C = 0x03 byte (SIGINT)
+- **Tab switching**: Ctrl+Tab / Ctrl+Shift+Tab on ALL platforms (not Cmd)
+
+### Avalonia KeyModifiers Ambiguity
+- Both `Avalonia.Input.KeyModifiers` and custom `PulseTerm.App.Services.KeyModifiers` exist
+- Must fully qualify: `Services.KeyModifiers` and `Avalonia.Input.KeyModifiers`
+- Return type of mapper methods must also be fully qualified
+
+### ITerminalEmulator.WriteInput Pattern
+- Events can only be invoked from declaring class (C# language rule)
+- Added `WriteInput(byte[] data)` to `ITerminalEmulator` to programmatically inject input
+- Implementation raises `UserInput` event → Bridge forwards to SSH
+- Alternative: could expose via SshTerminalBridge, but interface method is cleaner
+
+### Avalonia Clipboard API (11.3.x)
+- `IClipboard.GetTextAsync()` is **obsolete** → use `clipboard.TryGetTextAsync()` extension
+- Extension lives in `Avalonia.Input.Platform` namespace (via `ClipboardExtensions`)
+- Access clipboard: `TopLevel.GetTopLevel(this)?.Clipboard`
+- `SetTextAsync()` still works (not obsolete)
+
+### Avalonia Window.KeyBindings for Global Shortcuts
+- `<Window.KeyBindings>` in AXAML — no HotKey on MenuItem (Avalonia Issue #18482, causes macOS keyboard freeze)
+- `Gesture="Ctrl+T"` syntax, binds to `Command="{Binding TabBar.AddTabCommand}"`
+- Comma key gesture: `Gesture="Ctrl+OemComma"` (not `Ctrl+,`)
+- CloseTab requires parameterless command (`CloseActiveTabCommand`) since KeyBinding can't pass parameters
+
+### TabBarViewModel Extensions
+- Added `CloseActiveTabCommand`, `NextTabCommand`, `PreviousTabCommand`
+- Tab cycling wraps around: `(index + 1) % Tabs.Count` and `(index - 1 + Tabs.Count) % Tabs.Count`
+- `CloseActiveTab` delegates to existing `CloseTab(TabViewModel)` method
+
