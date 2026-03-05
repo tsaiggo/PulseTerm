@@ -1,3 +1,4 @@
+using System.Reactive;
 using ReactiveUI;
 
 namespace PulseTerm.App.ViewModels;
@@ -13,6 +14,8 @@ public class MainWindowViewModel : ReactiveObject
         _sidebar = new SidebarViewModel();
         _tabBar = new TabBarViewModel();
         _statusBar = new StatusBarViewModel();
+
+        OpenSettingsCommand = ReactiveCommand.Create(() => { });
     }
 
     public SidebarViewModel Sidebar
@@ -32,4 +35,6 @@ public class MainWindowViewModel : ReactiveObject
         get => _statusBar;
         set => this.RaiseAndSetIfChanged(ref _statusBar, value);
     }
+
+    public ReactiveCommand<Unit, Unit> OpenSettingsCommand { get; }
 }

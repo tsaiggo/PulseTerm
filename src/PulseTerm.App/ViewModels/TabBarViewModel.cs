@@ -16,6 +16,9 @@ public class TabBarViewModel : ReactiveObject
 
         AddTabCommand = ReactiveCommand.Create(AddTab);
         CloseTabCommand = ReactiveCommand.Create<TabViewModel>(CloseTab);
+        CloseActiveTabCommand = ReactiveCommand.Create(CloseActiveTab);
+        NextTabCommand = ReactiveCommand.Create(NextTab);
+        PreviousTabCommand = ReactiveCommand.Create(PreviousTab);
     }
 
     public ObservableCollection<TabViewModel> Tabs { get; }
@@ -28,6 +31,9 @@ public class TabBarViewModel : ReactiveObject
 
     public ReactiveCommand<Unit, Unit> AddTabCommand { get; }
     public ReactiveCommand<TabViewModel, Unit> CloseTabCommand { get; }
+    public ReactiveCommand<Unit, Unit> CloseActiveTabCommand { get; }
+    public ReactiveCommand<Unit, Unit> NextTabCommand { get; }
+    public ReactiveCommand<Unit, Unit> PreviousTabCommand { get; }
 
     private void AddTab()
     {
@@ -54,5 +60,29 @@ public class TabBarViewModel : ReactiveObject
                 ActiveTab = Tabs[Math.Min(index, Tabs.Count - 1)];
             }
         }
+    }
+
+    private void CloseActiveTab()
+    {
+        if (ActiveTab != null)
+            CloseTab(ActiveTab);
+    }
+
+    private void NextTab()
+    {
+        if (Tabs.Count == 0 || ActiveTab == null)
+            return;
+
+        var index = Tabs.IndexOf(ActiveTab);
+        ActiveTab = Tabs[(index + 1) % Tabs.Count];
+    }
+
+    private void PreviousTab()
+    {
+        if (Tabs.Count == 0 || ActiveTab == null)
+            return;
+
+        var index = Tabs.IndexOf(ActiveTab);
+        ActiveTab = Tabs[(index - 1 + Tabs.Count) % Tabs.Count];
     }
 }

@@ -24,6 +24,11 @@ public interface ITerminalEmulator : IDisposable
     event Action<byte[]>? UserInput;
     
     /// <summary>
+    /// Programmatically send input bytes as if the user typed them
+    /// </summary>
+    void WriteInput(byte[] data);
+    
+    /// <summary>
     /// Get the content of a specific line in the terminal buffer
     /// </summary>
     string GetBufferLine(int row);

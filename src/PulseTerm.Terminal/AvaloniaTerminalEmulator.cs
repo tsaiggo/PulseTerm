@@ -76,6 +76,11 @@ public class AvaloniaTerminalEmulator : ITerminalEmulator
         UserInput?.Invoke(data);
     }
 
+    public void WriteInput(byte[] data)
+    {
+        UserInput?.Invoke(data);
+    }
+
     public void Dispose()
     {
         if (_disposed)
