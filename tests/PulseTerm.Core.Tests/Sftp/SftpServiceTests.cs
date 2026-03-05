@@ -102,10 +102,7 @@ public class SftpServiceTests
 
         // Act
         await _sftpService.UploadFileAsync(_sessionId, localPath, remotePath, 
-            new Progress<TransferProgress>(p => progressReports.Add(p)));
-        
-        // Allow Progress<T> callbacks to complete (they are posted to sync context asynchronously)
-        await Task.Delay(50);
+            new SynchronousProgress<TransferProgress>(p => progressReports.Add(p)));
 
         // Assert
         await _sftpClient.Received(1).UploadAsync(
@@ -154,10 +151,7 @@ public class SftpServiceTests
 
         // Act
         await _sftpService.DownloadFileAsync(_sessionId, remotePath, localPath,
-            new Progress<TransferProgress>(p => progressReports.Add(p)));
-        
-        // Allow Progress<T> callbacks to complete (they are posted to sync context asynchronously)
-        await Task.Delay(50);
+            new SynchronousProgress<TransferProgress>(p => progressReports.Add(p)));
 
         // Assert
         await _sftpClient.Received(1).DownloadAsync(
@@ -179,13 +173,18 @@ public class SftpServiceTests
     {
         // Arrange
         var remotePath = "/home/user/todelete.txt";
+        var mockFile = CreateMockSftpFile("todelete.txt", remotePath, 1024, false, "rw-r--r--");
+
+        _sftpClient.Exists(remotePath).Returns(true);
+        _sftpClient.ListDirectory("/home/user")
+            .Returns(new[] { mockFile });
 
         // Act
         await _sftpService.DeleteAsync(_sessionId, remotePath);
 
         // Assert
-        // Need to verify the delete was called through the wrapper
-        // This will be implemented when SftpService is created
+        _sftpClient.Received(1).DeleteFile(remotePath);
+        _sftpClient.DidNotReceive().DeleteDirectory(Arg.Any<string>());
     }
 
     [Fact]
@@ -198,8 +197,79 @@ public class SftpServiceTests
         await _sftpService.CreateDirectoryAsync(_sessionId, remotePath);
 
         // Assert
-        // Need to verify the create directory was called through the wrapper
-        // This will be implemented when SftpService is created
+        _sftpClient.Received(1).CreateDirectory(remotePath);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithDirectory_DeletesDirectory()
+    {
+        // Arrange
+        var remotePath = "/home/user/mydir";
+        var mockDir = CreateMockSftpFile("mydir", remotePath, 0, true, "rwxr-xr-x");
+
+        _sftpClient.Exists(remotePath).Returns(true);
+        _sftpClient.ListDirectory("/home/user")
+            .Returns(new[] { mockDir });
+
+        // Act
+        await _sftpService.DeleteAsync(_sessionId, remotePath);
+
+        // Assert
+        _sftpClient.Received(1).DeleteDirectory(remotePath);
+        _sftpClient.DidNotReceive().DeleteFile(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenPathNotFound_ThrowsFileNotFoundException()
+    {
+        // Arrange
+        var remotePath = "/home/user/nonexistent.txt";
+        _sftpClient.Exists(remotePath).Returns(false);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<FileNotFoundException>(
+            () => _sftpService.DeleteAsync(_sessionId, remotePath));
+    }
+
+    [Fact]
+    public async Task ListDirectoryAsync_OwnerAndGroup_AreNotBooleanStrings()
+    {
+        // Arrange
+        var mockFile = CreateMockSftpFile("file.txt", "/home/user/file.txt", 1024, false, "rw-r--r--");
+        mockFile.UserId.Returns(1000);
+        mockFile.GroupId.Returns(1000);
+
+        _sftpClient.ListDirectoryAsync("/home/user", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IEnumerable<ISftpFile>>(new[] { mockFile }));
+
+        // Act
+        var result = await _sftpService.ListDirectoryAsync(_sessionId, "/home/user");
+
+        // Assert
+        result[0].Owner.Should().Be("1000");
+        result[0].Group.Should().Be("1000");
+        result[0].Owner.Should().NotBe("True");
+        result[0].Owner.Should().NotBe("False");
+        result[0].Group.Should().NotBe("True");
+        result[0].Group.Should().NotBe("False");
+    }
+
+    [Fact]
+    public async Task DisposeAsync_DisconnectsAndDisposesAllClients()
+    {
+        // Arrange — trigger client caching by calling any method
+        var mockFile = CreateMockSftpFile("file.txt", "/home/user/file.txt", 0, false, "rw-r--r--");
+        _sftpClient.ListDirectoryAsync("/home/user", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IEnumerable<ISftpFile>>(new[] { mockFile }));
+
+        await _sftpService.ListDirectoryAsync(_sessionId, "/home/user");
+
+        // Act
+        await ((IAsyncDisposable)_sftpService).DisposeAsync();
+
+        // Assert
+        _sftpClient.Received(1).Disconnect();
+        _sftpClient.Received(1).Dispose();
     }
 
     [Fact]
@@ -244,10 +314,7 @@ public class SftpServiceTests
 
         // Act
         await _sftpService.UploadFileAsync(_sessionId, localPath, remotePath,
-            new Progress<TransferProgress>(p => progressReports.Add(p)));
-        
-        // Allow Progress<T> callbacks to complete (they are posted to sync context asynchronously)
-        await Task.Delay(50);
+            new SynchronousProgress<TransferProgress>(p => progressReports.Add(p)));
 
         // Assert
         progressReports.Should().HaveCountGreaterThanOrEqualTo(4);
@@ -279,6 +346,13 @@ public class SftpServiceTests
         result.FullPath.Should().Be(remotePath);
         result.Size.Should().Be(4096);
         result.IsDirectory.Should().BeFalse();
+    }
+
+    private class SynchronousProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _handler;
+        public SynchronousProgress(Action<T> handler) => _handler = handler;
+        public void Report(T value) => _handler(value);
     }
 
     private ISftpFile CreateMockSftpFile(string name, string fullName, long length, bool isDirectory, string permissions)

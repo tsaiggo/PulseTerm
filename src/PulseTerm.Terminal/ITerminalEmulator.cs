@@ -6,7 +6,7 @@ namespace PulseTerm.Terminal;
 /// Interface for terminal emulator that can be swapped between implementations
 /// (AvaloniaTerminal, xterm.js, etc.)
 /// </summary>
-public interface ITerminalEmulator
+public interface ITerminalEmulator : IDisposable
 {
     /// <summary>
     /// Feed raw bytes from SSH stream to terminal

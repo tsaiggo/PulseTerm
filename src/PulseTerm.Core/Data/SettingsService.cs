@@ -24,21 +24,21 @@ public class SettingsService : ISettingsService
 
     public async Task<AppSettings> GetSettingsAsync()
     {
-        return await _dataStore.LoadAsync<AppSettings>(_settingsPath) ?? new AppSettings();
+        return await _dataStore.LoadAsync<AppSettings>(_settingsPath).ConfigureAwait(false) ?? new AppSettings();
     }
 
     public async Task SaveSettingsAsync(AppSettings settings)
     {
-        await _dataStore.SaveAsync(_settingsPath, settings);
+        await _dataStore.SaveAsync(_settingsPath, settings).ConfigureAwait(false);
     }
 
     public async Task<AppState> GetStateAsync()
     {
-        return await _dataStore.LoadAsync<AppState>(_statePath) ?? new AppState();
+        return await _dataStore.LoadAsync<AppState>(_statePath).ConfigureAwait(false) ?? new AppState();
     }
 
     public async Task SaveStateAsync(AppState state)
     {
-        await _dataStore.SaveAsync(_statePath, state);
+        await _dataStore.SaveAsync(_statePath, state).ConfigureAwait(false);
     }
 }

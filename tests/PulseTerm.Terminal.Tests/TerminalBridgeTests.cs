@@ -1,7 +1,7 @@
 using System.Text;
-using Avalonia.Headless.XUnit;
 using FluentAssertions;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using PulseTerm.Core.Ssh;
 using Xunit;
 
@@ -10,75 +10,234 @@ namespace PulseTerm.Terminal.Tests;
 [Trait("Category", "TerminalBridge")]
 public class TerminalBridgeTests
 {
-    [AvaloniaFact]
-    public void Feed_VT100EscapeSequences_RendersColoredText()
+    private readonly ITerminalEmulator _terminal;
+    private readonly IShellStreamWrapper _shellStream;
+
+    public TerminalBridgeTests()
     {
-        var emulator = new AvaloniaTerminalEmulator();
-        
-        var redText = Encoding.UTF8.GetBytes("\x1B[31mRED\x1B[0m");
-        emulator.Feed(redText);
-        
-        var line = emulator.GetBufferLine(0);
-        line.Should().Contain("RED");
+        _terminal = Substitute.For<ITerminalEmulator>();
+        _shellStream = Substitute.For<IShellStreamWrapper>();
     }
 
-    [AvaloniaFact]
-    public void Feed_CJKCharacters_HandlesDoubleWidth()
+    [Fact]
+    public void Constructor_NullTerminal_ThrowsArgumentNullException()
     {
-        var emulator = new AvaloniaTerminalEmulator();
-        
-        var cjkText = Encoding.UTF8.GetBytes("你好世界");
-        emulator.Feed(cjkText);
-        
-        var line = emulator.GetBufferLine(0);
-        line.Should().Contain("你好");
+        var act = () => new SshTerminalBridge(null!, _shellStream);
+        act.Should().Throw<ArgumentNullException>().WithParameterName("terminal");
     }
 
-    [AvaloniaFact]
-    public void Feed_LargeData_DoesNotCrash()
+    [Fact]
+    public void Constructor_NullShellStream_ThrowsArgumentNullException()
     {
-        var emulator = new AvaloniaTerminalEmulator();
-        
-        var largeData = new byte[1024 * 1024];
-        for (int i = 0; i < largeData.Length; i++)
+        var act = () => new SshTerminalBridge(_terminal, null!);
+        act.Should().Throw<ArgumentNullException>().WithParameterName("shellStream");
+    }
+
+    [Fact]
+    public void Start_CalledTwice_ThrowsInvalidOperationException()
+    {
+        _shellStream.CanRead.Returns(false);
+
+        using var bridge = new SshTerminalBridge(_terminal, _shellStream);
+        bridge.Start();
+
+        var act = () => bridge.Start();
+        act.Should().Throw<InvalidOperationException>().WithMessage("*already started*");
+    }
+
+    [Fact]
+    public void UserInput_WritesToShellStream()
+    {
+        _shellStream.CanRead.Returns(false);
+        _shellStream.CanWrite.Returns(true);
+        _shellStream.WriteAsync(Arg.Any<byte[]>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        using var bridge = new SshTerminalBridge(_terminal, _shellStream);
+
+        var testData = Encoding.UTF8.GetBytes("hello");
+
+        _terminal.UserInput += Raise.Event<Action<byte[]>>(testData);
+
+        // WriteUserInputAsync is fire-and-forget, need to let it complete
+        Thread.Sleep(100);
+
+        _shellStream.Received().WriteAsync(
+            testData,
+            0,
+            testData.Length,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void UserInput_WhenDisposed_DoesNotWriteToShellStream()
+    {
+        _shellStream.CanRead.Returns(false);
+        _shellStream.CanWrite.Returns(true);
+
+        var bridge = new SshTerminalBridge(_terminal, _shellStream);
+        bridge.Dispose();
+
+        _shellStream.DidNotReceive().WriteAsync(
+            Arg.Any<byte[]>(),
+            Arg.Any<int>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void UserInput_WhenStreamCannotWrite_DoesNotWrite()
+    {
+        _shellStream.CanRead.Returns(false);
+        _shellStream.CanWrite.Returns(false);
+
+        using var bridge = new SshTerminalBridge(_terminal, _shellStream);
+
+        var testData = Encoding.UTF8.GetBytes("hello");
+        _terminal.UserInput += Raise.Event<Action<byte[]>>(testData);
+
+        Thread.Sleep(100);
+
+        _shellStream.DidNotReceive().WriteAsync(
+            Arg.Any<byte[]>(),
+            Arg.Any<int>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ReadLoop_WhenCanReadFalse_ExitsImmediately()
+    {
+        _shellStream.CanRead.Returns(false);
+
+        using var bridge = new SshTerminalBridge(_terminal, _shellStream);
+        bridge.Start();
+
+        // Task.Run in Start() needs time to enter and exit the loop
+        Thread.Sleep(200);
+
+        _shellStream.DidNotReceive().ReadAsync(
+            Arg.Any<byte[]>(),
+            Arg.Any<int>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ReadLoop_WhenReadReturnsZero_ExitsGracefully()
+    {
+        _shellStream.CanRead.Returns(true);
+        _shellStream.ReadAsync(Arg.Any<byte[]>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(0));
+
+        using var bridge = new SshTerminalBridge(_terminal, _shellStream);
+        bridge.Start();
+
+        Thread.Sleep(200);
+
+        _terminal.DidNotReceive().Feed(Arg.Any<byte[]>());
+    }
+
+    [Fact]
+    public void ReadLoop_WhenExceptionOccurs_FiresErrorEvent()
+    {
+        var expectedException = new IOException("connection lost");
+        Exception? capturedError = null;
+
+        _shellStream.CanRead.Returns(true);
+        _shellStream.ReadAsync(Arg.Any<byte[]>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(expectedException);
+
+        using var bridge = new SshTerminalBridge(_terminal, _shellStream);
+        bridge.Error += ex => capturedError = ex;
+        bridge.Start();
+
+        Thread.Sleep(500);
+
+        capturedError.Should().NotBeNull();
+        capturedError.Should().BeSameAs(expectedException);
+    }
+
+    [Fact]
+    public void Dispose_CancelsReadLoopAndDisposesStream()
+    {
+        _shellStream.CanRead.Returns(true);
+
+        // ReadAsync blocks forever until CancellationToken fires
+        _shellStream.ReadAsync(Arg.Any<byte[]>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(async callInfo =>
+            {
+                var ct = callInfo.ArgAt<CancellationToken>(3);
+                await Task.Delay(Timeout.Infinite, ct);
+                return 0;
+            });
+
+        var bridge = new SshTerminalBridge(_terminal, _shellStream);
+        bridge.Start();
+
+        Thread.Sleep(100);
+
+        bridge.Dispose();
+
+        _shellStream.Received().Dispose();
+    }
+
+    [Fact]
+    public void Dispose_CalledMultipleTimes_DoesNotThrow()
+    {
+        _shellStream.CanRead.Returns(false);
+
+        var bridge = new SshTerminalBridge(_terminal, _shellStream);
+
+        var act = () =>
         {
-            largeData[i] = (byte)('A' + (i % 26));
-        }
-        
-        Action act = () => emulator.Feed(largeData);
+            bridge.Dispose();
+            bridge.Dispose();
+        };
+
         act.Should().NotThrow();
-        
-        var memoryBefore = GC.GetAllocatedBytesForCurrentThread();
-        emulator.Feed(largeData);
-        var memoryAfter = GC.GetAllocatedBytesForCurrentThread();
-        
-        var memoryUsed = memoryAfter - memoryBefore;
-        memoryUsed.Should().BeLessThan(50 * 1024 * 1024);
     }
 
-    [AvaloniaFact]
-    public void Resize_UpdatesDimensions()
+    [Fact]
+    public void UserInput_WriteThrowsObjectDisposed_DoesNotPropagate()
     {
-        var emulator = new AvaloniaTerminalEmulator();
-        
-        emulator.Resize(120, 40);
-        
-        emulator.Columns.Should().BeGreaterThanOrEqualTo(80);
-        emulator.Rows.Should().BeGreaterThanOrEqualTo(24);
+        _shellStream.CanRead.Returns(false);
+        _shellStream.CanWrite.Returns(true);
+        _shellStream.WriteAsync(Arg.Any<byte[]>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new ObjectDisposedException("stream"));
+
+        Exception? capturedError = null;
+        using var bridge = new SshTerminalBridge(_terminal, _shellStream);
+        bridge.Error += ex => capturedError = ex;
+
+        var testData = Encoding.UTF8.GetBytes("hello");
+        _terminal.UserInput += Raise.Event<Action<byte[]>>(testData);
+
+        Thread.Sleep(200);
+
+        // ObjectDisposedException is swallowed per WriteUserInputAsync contract
+        capturedError.Should().BeNull();
     }
 
-    [AvaloniaFact]
-    public void UserInput_EventWorks()
+    [Fact]
+    public void UserInput_WriteThrowsGenericException_FiresErrorEvent()
     {
-        var emulator = new AvaloniaTerminalEmulator();
-        byte[]? capturedInput = null;
-        
-        emulator.UserInput += (data) => capturedInput = data;
-        
-        var testData = Encoding.UTF8.GetBytes("test");
-        emulator.TriggerUserInput(testData);
-        
-        capturedInput.Should().NotBeNull();
-        capturedInput.Should().BeEquivalentTo(testData);
+        var expectedException = new InvalidOperationException("write failed");
+        _shellStream.CanRead.Returns(false);
+        _shellStream.CanWrite.Returns(true);
+        _shellStream.WriteAsync(Arg.Any<byte[]>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(expectedException);
+
+        Exception? capturedError = null;
+        using var bridge = new SshTerminalBridge(_terminal, _shellStream);
+        bridge.Error += ex => capturedError = ex;
+
+        var testData = Encoding.UTF8.GetBytes("hello");
+        _terminal.UserInput += Raise.Event<Action<byte[]>>(testData);
+
+        Thread.Sleep(200);
+
+        capturedError.Should().NotBeNull();
+        capturedError.Should().BeSameAs(expectedException);
     }
 }

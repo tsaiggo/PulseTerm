@@ -13,29 +13,25 @@ public class JsonDataStore
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public async Task<T?> LoadAsync<T>(string filePath) where T : class, new()
+    public async Task<T?> LoadAsync<T>(string filePath, CancellationToken cancellationToken = default) where T : class, new()
     {
-        if (!File.Exists(filePath))
-        {
-            return new T();
-        }
-
-        var fileLock = await GetFileLockAsync(filePath);
-        await fileLock.WaitAsync();
+        var fileLock = await GetFileLockAsync(filePath).ConfigureAwait(false);
+        await fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         
         try
         {
+            if (!File.Exists(filePath))
+            {
+                return new T();
+            }
+
             await using var stream = new FileStream(
                 filePath,
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.Read);
                 
-            return await JsonSerializer.DeserializeAsync<T>(stream, _options);
-        }
-        catch (JsonException)
-        {
-            throw;
+            return await JsonSerializer.DeserializeAsync<T>(stream, _options, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -43,7 +39,7 @@ public class JsonDataStore
         }
     }
 
-    public async Task SaveAsync<T>(string filePath, T data)
+    public async Task SaveAsync<T>(string filePath, T data, CancellationToken cancellationToken = default)
     {
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -51,8 +47,8 @@ public class JsonDataStore
             Directory.CreateDirectory(directory);
         }
 
-        var fileLock = await GetFileLockAsync(filePath);
-        await fileLock.WaitAsync();
+        var fileLock = await GetFileLockAsync(filePath).ConfigureAwait(false);
+        await fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         
         try
         {
@@ -66,12 +62,12 @@ public class JsonDataStore
                         FileAccess.Write,
                         FileShare.None);
                         
-                    await JsonSerializer.SerializeAsync(stream, data, _options);
+                    await JsonSerializer.SerializeAsync(stream, data, _options, cancellationToken).ConfigureAwait(false);
                     return;
                 }
                 catch (IOException) when (attempt < 2)
                 {
-                    await Task.Delay((int)Math.Pow(2, attempt) * 100);
+                    await Task.Delay((int)Math.Pow(2, attempt) * 100, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -83,7 +79,7 @@ public class JsonDataStore
 
     private async Task<SemaphoreSlim> GetFileLockAsync(string filePath)
     {
-        await _dictionaryLock.WaitAsync();
+        await _dictionaryLock.WaitAsync().ConfigureAwait(false);
         try
         {
             if (!_fileLocks.TryGetValue(filePath, out var fileLock))

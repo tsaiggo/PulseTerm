@@ -20,4 +20,9 @@ public interface ISftpClientWrapper : IDisposable
 
     void DownloadFile(string path, Stream output);
     Task DownloadAsync(string path, Stream output, Action<ulong>? downloadCallback = null, CancellationToken cancellationToken = default);
+
+    void DeleteFile(string path);
+    void DeleteDirectory(string path);
+    void CreateDirectory(string path);
+    bool Exists(string path);
 }

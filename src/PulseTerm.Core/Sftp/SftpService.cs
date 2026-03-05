@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using PulseTerm.Core.Models;
 using PulseTerm.Core.Ssh;
@@ -8,9 +9,8 @@ namespace PulseTerm.Core.Sftp;
 public class SftpService : ISftpService
 {
     private readonly ISshConnectionService _connectionService;
-    private readonly Dictionary<Guid, ISftpClientWrapper> _sftpClients = new();
+    private readonly ConcurrentDictionary<Guid, ISftpClientWrapper> _sftpClients = new();
     private readonly Func<ISftpClientWrapper>? _sftpClientFactory;
-    private const int BufferSize = 256 * 1024;
 
     public SftpService(ISshConnectionService connectionService, Func<ISftpClientWrapper>? sftpClientFactory = null)
     {
@@ -20,72 +20,40 @@ public class SftpService : ISftpService
 
     public async Task<List<RemoteFileInfo>> ListDirectoryAsync(Guid sessionId, string path, CancellationToken cancellationToken = default)
     {
-        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken);
-        var files = await client.ListDirectoryAsync(path, cancellationToken);
+        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        var files = await client.ListDirectoryAsync(path, cancellationToken).ConfigureAwait(false);
 
         return files
             .Where(f => f.Name != "." && f.Name != "..")
-            .Select(f => new RemoteFileInfo
-            {
-                Name = f.Name,
-                FullPath = f.FullName,
-                Size = f.Length,
-                Permissions = FormatPermissions(f),
-                IsDirectory = f.IsDirectory,
-                LastModified = f.LastWriteTime,
-                Owner = f.OwnerCanRead.ToString(),
-                Group = f.GroupCanRead.ToString()
-            })
+            .Select(MapToRemoteFileInfo)
             .ToList();
     }
 
     public async Task UploadFileAsync(Guid sessionId, string localPath, string remotePath, 
         IProgress<TransferProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken);
+        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken).ConfigureAwait(false);
         var fileInfo = new FileInfo(localPath);
         var totalBytes = fileInfo.Length;
         var fileName = Path.GetFileName(localPath);
 
         var stopwatch = Stopwatch.StartNew();
-        long lastBytesTransferred = 0;
 
         await using var fileStream = File.OpenRead(localPath);
         
         await client.UploadAsync(fileStream, remotePath, bytesTransferred =>
         {
-            if (progress != null)
-            {
-                var elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
-                var speed = elapsedSeconds > 0 ? (long)bytesTransferred / elapsedSeconds : 0;
-                var remainingBytes = totalBytes - (long)bytesTransferred;
-                var estimatedTimeRemaining = speed > 0 
-                    ? TimeSpan.FromSeconds(remainingBytes / speed) 
-                    : TimeSpan.Zero;
-
-                var transferProgress = new TransferProgress
-                {
-                    FileName = fileName,
-                    BytesTransferred = (long)bytesTransferred,
-                    TotalBytes = totalBytes,
-                    Percentage = totalBytes > 0 ? (int)(bytesTransferred * 100 / (ulong)totalBytes) : 0,
-                    SpeedBytesPerSecond = speed,
-                    EstimatedTimeRemaining = estimatedTimeRemaining
-                };
-
-                progress.Report(transferProgress);
-                lastBytesTransferred = (long)bytesTransferred;
-            }
-        }, cancellationToken);
+            ReportProgress(progress, fileName, (long)bytesTransferred, totalBytes, stopwatch);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task DownloadFileAsync(Guid sessionId, string remotePath, string localPath, 
         IProgress<TransferProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken);
-        var fileName = Path.GetFileName(remotePath);
+        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        var fileName = GetUnixFileName(remotePath);
 
-        var fileInfo = await GetFileInfoAsync(sessionId, remotePath, cancellationToken);
+        var fileInfo = await GetFileInfoAsync(sessionId, remotePath, cancellationToken).ConfigureAwait(false);
         var totalBytes = fileInfo.Size;
 
         var stopwatch = Stopwatch.StartNew();
@@ -94,58 +62,52 @@ public class SftpService : ISftpService
         
         await client.DownloadAsync(remotePath, fileStream, bytesTransferred =>
         {
-            if (progress != null)
-            {
-                var elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
-                var speed = elapsedSeconds > 0 ? (long)bytesTransferred / elapsedSeconds : 0;
-                var remainingBytes = totalBytes - (long)bytesTransferred;
-                var estimatedTimeRemaining = speed > 0 
-                    ? TimeSpan.FromSeconds(remainingBytes / speed) 
-                    : TimeSpan.Zero;
-
-                var transferProgress = new TransferProgress
-                {
-                    FileName = fileName,
-                    BytesTransferred = (long)bytesTransferred,
-                    TotalBytes = totalBytes,
-                    Percentage = totalBytes > 0 ? (int)(bytesTransferred * 100 / (ulong)totalBytes) : 0,
-                    SpeedBytesPerSecond = speed,
-                    EstimatedTimeRemaining = estimatedTimeRemaining
-                };
-
-                progress.Report(transferProgress);
-            }
-        }, cancellationToken);
+            ReportProgress(progress, fileName, (long)bytesTransferred, totalBytes, stopwatch);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(Guid sessionId, string remotePath, CancellationToken cancellationToken = default)
     {
-        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken);
+        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken).ConfigureAwait(false);
         await Task.Run(() =>
         {
-            var files = client.ListDirectory(remotePath).ToList();
-            if (files.Any() && files.First().IsDirectory)
+            if (!client.Exists(remotePath))
             {
-                throw new InvalidOperationException("Cannot delete directories with DeleteAsync. Use recursive delete or remove directory method.");
+                throw new FileNotFoundException($"Remote path not found: {remotePath}");
             }
-        }, cancellationToken);
+
+            var parentDir = GetUnixParentDirectory(remotePath);
+            var name = GetUnixFileName(remotePath);
+            var entries = client.ListDirectory(parentDir);
+            var entry = entries.FirstOrDefault(f => f.Name == name);
+
+            if (entry != null && entry.IsDirectory)
+            {
+                client.DeleteDirectory(remotePath);
+            }
+            else
+            {
+                client.DeleteFile(remotePath);
+            }
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task CreateDirectoryAsync(Guid sessionId, string remotePath, CancellationToken cancellationToken = default)
     {
-        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken);
+        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken).ConfigureAwait(false);
         await Task.Run(() =>
         {
-        }, cancellationToken);
+            client.CreateDirectory(remotePath);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<RemoteFileInfo> GetFileInfoAsync(Guid sessionId, string remotePath, CancellationToken cancellationToken = default)
     {
-        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken);
-        var parentDir = Path.GetDirectoryName(remotePath)?.Replace("\\", "/") ?? "/";
-        var fileName = Path.GetFileName(remotePath);
+        var client = await GetOrCreateSftpClientAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        var parentDir = GetUnixParentDirectory(remotePath);
+        var fileName = GetUnixFileName(remotePath);
 
-        var files = await client.ListDirectoryAsync(parentDir, cancellationToken);
+        var files = await client.ListDirectoryAsync(parentDir, cancellationToken).ConfigureAwait(false);
         var file = files.FirstOrDefault(f => f.Name == fileName);
 
         if (file == null)
@@ -153,17 +115,31 @@ public class SftpService : ISftpService
             throw new FileNotFoundException($"File not found: {remotePath}");
         }
 
-        return new RemoteFileInfo
+        return MapToRemoteFileInfo(file);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var kvp in _sftpClients)
         {
-            Name = file.Name,
-            FullPath = file.FullName,
-            Size = file.Length,
-            Permissions = FormatPermissions(file),
-            IsDirectory = file.IsDirectory,
-            LastModified = file.LastWriteTime,
-            Owner = file.OwnerCanRead.ToString(),
-            Group = file.GroupCanRead.ToString()
-        };
+            try
+            {
+                if (kvp.Value.IsConnected)
+                {
+                    kvp.Value.Disconnect();
+                }
+
+                kvp.Value.Dispose();
+            }
+            catch
+            {
+                // Best-effort cleanup during disposal
+            }
+        }
+
+        _sftpClients.Clear();
+
+        await ValueTask.CompletedTask.ConfigureAwait(false);
     }
 
     private async Task<ISftpClientWrapper> GetOrCreateSftpClientAsync(Guid sessionId, CancellationToken cancellationToken)
@@ -193,13 +169,64 @@ public class SftpService : ISftpService
         }
 
         var client = _sftpClientFactory();
-        await client.ConnectAsync(cancellationToken);
+        await client.ConnectAsync(cancellationToken).ConfigureAwait(false);
 
         _sftpClients[sessionId] = client;
         return client;
     }
 
-    private string FormatPermissions(ISftpFile file)
+    private static RemoteFileInfo MapToRemoteFileInfo(ISftpFile file)
+    {
+        return new RemoteFileInfo
+        {
+            Name = file.Name,
+            FullPath = file.FullName,
+            Size = file.Length,
+            Permissions = FormatPermissions(file),
+            IsDirectory = file.IsDirectory,
+            LastModified = file.LastWriteTime,
+            Owner = file.UserId.ToString(),
+            Group = file.GroupId.ToString()
+        };
+    }
+
+    private static void ReportProgress(IProgress<TransferProgress>? progress, string fileName, long bytesTransferred, long totalBytes, Stopwatch stopwatch)
+    {
+        if (progress == null) return;
+
+        var elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
+        var speed = elapsedSeconds > 0 ? bytesTransferred / elapsedSeconds : 0;
+        var remainingBytes = totalBytes - bytesTransferred;
+        var estimatedTimeRemaining = speed > 0
+            ? TimeSpan.FromSeconds(remainingBytes / speed)
+            : TimeSpan.Zero;
+
+        var transferProgress = new TransferProgress
+        {
+            FileName = fileName,
+            BytesTransferred = bytesTransferred,
+            TotalBytes = totalBytes,
+            Percentage = totalBytes > 0 ? (int)(bytesTransferred * 100 / totalBytes) : 0,
+            SpeedBytesPerSecond = speed,
+            EstimatedTimeRemaining = estimatedTimeRemaining
+        };
+
+        progress.Report(transferProgress);
+    }
+
+    private static string GetUnixParentDirectory(string remotePath)
+    {
+        var lastSlash = remotePath.LastIndexOf('/');
+        return lastSlash > 0 ? remotePath[..lastSlash] : "/";
+    }
+
+    private static string GetUnixFileName(string remotePath)
+    {
+        var lastSlash = remotePath.LastIndexOf('/');
+        return lastSlash >= 0 ? remotePath[(lastSlash + 1)..] : remotePath;
+    }
+
+    private static string FormatPermissions(ISftpFile file)
     {
         var perms = file.IsDirectory ? "d" : "-";
         

@@ -6,6 +6,7 @@ public class SessionRepository : ISessionRepository
 {
     private readonly JsonDataStore _dataStore;
     private readonly string _dataPath;
+    private readonly SemaphoreSlim _operationLock = new(1, 1);
 
     public SessionRepository(JsonDataStore dataStore, string? dataPath = null)
     {
@@ -24,79 +25,111 @@ public class SessionRepository : ISessionRepository
 
     public async Task<List<ServerGroup>> GetAllGroupsAsync()
     {
-        var data = await LoadDataAsync();
+        var data = await LoadDataAsync().ConfigureAwait(false);
         return data.Groups;
     }
 
     public async Task<SessionProfile?> GetSessionAsync(Guid id)
     {
-        var data = await LoadDataAsync();
+        var data = await LoadDataAsync().ConfigureAwait(false);
         return data.Sessions.FirstOrDefault(s => s.Id == id);
     }
 
     public async Task SaveSessionAsync(SessionProfile session)
     {
-        var data = await LoadDataAsync();
-        var existingIndex = data.Sessions.FindIndex(s => s.Id == session.Id);
-        
-        if (existingIndex >= 0)
+        await _operationLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            data.Sessions[existingIndex] = session;
+            var data = await LoadDataAsync().ConfigureAwait(false);
+            var existingIndex = data.Sessions.FindIndex(s => s.Id == session.Id);
+            
+            if (existingIndex >= 0)
+            {
+                data.Sessions[existingIndex] = session;
+            }
+            else
+            {
+                data.Sessions.Add(session);
+            }
+            
+            await _dataStore.SaveAsync(_dataPath, data).ConfigureAwait(false);
         }
-        else
+        finally
         {
-            data.Sessions.Add(session);
+            _operationLock.Release();
         }
-        
-        await _dataStore.SaveAsync(_dataPath, data);
     }
 
     public async Task DeleteSessionAsync(Guid id)
     {
-        var data = await LoadDataAsync();
-        data.Sessions.RemoveAll(s => s.Id == id);
-        
-        foreach (var group in data.Groups)
+        await _operationLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            group.Sessions.Remove(id);
+            var data = await LoadDataAsync().ConfigureAwait(false);
+            data.Sessions.RemoveAll(s => s.Id == id);
+            
+            foreach (var group in data.Groups)
+            {
+                group.Sessions.Remove(id);
+            }
+            
+            await _dataStore.SaveAsync(_dataPath, data).ConfigureAwait(false);
         }
-        
-        await _dataStore.SaveAsync(_dataPath, data);
+        finally
+        {
+            _operationLock.Release();
+        }
     }
 
     public async Task SaveGroupAsync(ServerGroup group)
     {
-        var data = await LoadDataAsync();
-        var existingIndex = data.Groups.FindIndex(g => g.Id == group.Id);
-        
-        if (existingIndex >= 0)
+        await _operationLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            data.Groups[existingIndex] = group;
+            var data = await LoadDataAsync().ConfigureAwait(false);
+            var existingIndex = data.Groups.FindIndex(g => g.Id == group.Id);
+            
+            if (existingIndex >= 0)
+            {
+                data.Groups[existingIndex] = group;
+            }
+            else
+            {
+                data.Groups.Add(group);
+            }
+            
+            await _dataStore.SaveAsync(_dataPath, data).ConfigureAwait(false);
         }
-        else
+        finally
         {
-            data.Groups.Add(group);
+            _operationLock.Release();
         }
-        
-        await _dataStore.SaveAsync(_dataPath, data);
     }
 
     public async Task DeleteGroupAsync(Guid id)
     {
-        var data = await LoadDataAsync();
-        data.Groups.RemoveAll(g => g.Id == id);
-        
-        foreach (var session in data.Sessions.Where(s => s.GroupId == id))
+        await _operationLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            session.GroupId = null;
+            var data = await LoadDataAsync().ConfigureAwait(false);
+            data.Groups.RemoveAll(g => g.Id == id);
+            
+            foreach (var session in data.Sessions.Where(s => s.GroupId == id))
+            {
+                session.GroupId = null;
+            }
+            
+            await _dataStore.SaveAsync(_dataPath, data).ConfigureAwait(false);
         }
-        
-        await _dataStore.SaveAsync(_dataPath, data);
+        finally
+        {
+            _operationLock.Release();
+        }
     }
 
     private async Task<SessionData> LoadDataAsync()
     {
-        return await _dataStore.LoadAsync<SessionData>(_dataPath) ?? new SessionData();
+        return await _dataStore.LoadAsync<SessionData>(_dataPath).ConfigureAwait(false) ?? new SessionData();
     }
 }
 

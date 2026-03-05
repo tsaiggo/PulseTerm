@@ -2,7 +2,16 @@ using PulseTerm.Core.Models;
 
 namespace PulseTerm.Core.Sftp;
 
-public interface ITransferManager
+/// <summary>
+/// Delegate for executing a file transfer. Injected by the caller (e.g., SftpService)
+/// to perform the actual upload/download work.
+/// </summary>
+public delegate Task TransferExecutor(
+    TransferTask task,
+    IProgress<TransferProgress> progress,
+    CancellationToken cancellationToken);
+
+public interface ITransferManager : IDisposable
 {
     int MaxConcurrentTransfers { get; set; }
     IReadOnlyList<TransferTask> ActiveTransfers { get; }

@@ -2,7 +2,7 @@ using PulseTerm.Core.Models;
 
 namespace PulseTerm.Core.Sftp;
 
-public interface ISftpService
+public interface ISftpService : IAsyncDisposable
 {
     Task<List<RemoteFileInfo>> ListDirectoryAsync(Guid sessionId, string path, CancellationToken cancellationToken = default);
     Task UploadFileAsync(Guid sessionId, string localPath, string remotePath, IProgress<TransferProgress>? progress = null, CancellationToken cancellationToken = default);

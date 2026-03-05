@@ -6,32 +6,51 @@ namespace PulseTerm.Core.Ssh;
 public class SshClientWrapper : ISshClientWrapper
 {
     private readonly SshClient _client;
+    private bool _disposed;
 
     public SshClientWrapper(SshClient client)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
     }
 
-    public bool IsConnected => _client.IsConnected;
+    public bool IsConnected
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _client.IsConnected;
+        }
+    }
 
     public TimeSpan ConnectionTimeout
     {
-        get => _client.ConnectionInfo.Timeout;
-        set => _client.ConnectionInfo.Timeout = value;
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _client.ConnectionInfo.Timeout;
+        }
+        set
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _client.ConnectionInfo.Timeout = value;
+        }
     }
 
     public void Connect()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         _client.Connect();
     }
 
     public Task ConnectAsync(CancellationToken cancellationToken)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         return _client.ConnectAsync(cancellationToken);
     }
 
     public void Disconnect()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         _client.Disconnect();
     }
 
@@ -44,6 +63,8 @@ public class SshClientWrapper : ISshClientWrapper
         int bufferSize,
         IDictionary<TerminalModes, uint>? terminalModeValues = null)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         var shellStream = _client.CreateShellStream(
             terminalName,
             columns,
@@ -58,16 +79,32 @@ public class SshClientWrapper : ISshClientWrapper
 
     public void AddForwardedPort(ForwardedPort port)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         _client.AddForwardedPort(port);
     }
 
     public void RemoveForwardedPort(ForwardedPort port)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         _client.RemoveForwardedPort(port);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                _client.Dispose();
+            }
+
+            _disposed = true;
+        }
     }
 
     public void Dispose()
     {
-        _client?.Dispose();
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }

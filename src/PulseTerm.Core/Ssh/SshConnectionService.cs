@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using DynamicData;
 using Microsoft.Extensions.Logging;
 using PulseTerm.Core.Models;
@@ -7,11 +8,13 @@ namespace PulseTerm.Core.Ssh;
 public class SshConnectionService : ISshConnectionService
 {
     private readonly ILogger<SshConnectionService>? _logger;
-    private readonly Func<ISshClientWrapper> _clientFactory;
+    private readonly Func<Models.ConnectionInfo, ISshClientWrapper> _clientFactory;
     private readonly SourceList<SshSession> _sessions = new();
-    private readonly Dictionary<Guid, ISshClientWrapper> _clients = new();
+    private readonly ConcurrentDictionary<Guid, ISshClientWrapper> _clients = new();
 
-    public SshConnectionService(Func<ISshClientWrapper> clientFactory, ILogger<SshConnectionService>? logger = null)
+    public SshConnectionService(
+        Func<Models.ConnectionInfo, ISshClientWrapper> clientFactory,
+        ILogger<SshConnectionService>? logger = null)
     {
         _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
         _logger = logger;
@@ -29,13 +32,16 @@ public class SshConnectionService : ISshConnectionService
 
         _sessions.Add(session);
 
+        ISshClientWrapper? client = null;
         try
         {
-            var client = _clientFactory();
-            await client.ConnectAsync(cancellationToken);
+            client = _clientFactory(connectionInfo);
+            await client.ConnectAsync(cancellationToken).ConfigureAwait(false);
 
             if (!client.IsConnected)
             {
+                client.Dispose();
+                client = null;
                 throw new InvalidOperationException("Client connection failed without exception");
             }
 
@@ -51,8 +57,11 @@ public class SshConnectionService : ISshConnectionService
         }
         catch (Exception ex)
         {
+            client?.Dispose();
+
             session.Status = SessionStatus.Error;
             session.ErrorMessage = ex.Message;
+            _sessions.Remove(session);
 
             _logger?.LogError(ex, "Failed to connect SSH session {SessionId} to {Host}:{Port}",
                 session.SessionId, connectionInfo.Host, connectionInfo.Port);
@@ -69,15 +78,13 @@ public class SshConnectionService : ISshConnectionService
             throw new InvalidOperationException($"Session {sessionId} not found");
         }
 
-        if (_clients.TryGetValue(sessionId, out var client))
+        if (_clients.TryRemove(sessionId, out var client))
         {
             await Task.Run(() =>
             {
                 client.Disconnect();
                 client.Dispose();
-            }, cancellationToken);
-
-            _clients.Remove(sessionId);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         session.Status = SessionStatus.Disconnected;
@@ -88,5 +95,37 @@ public class SshConnectionService : ISshConnectionService
     public SshSession? GetSession(Guid sessionId)
     {
         return _sessions.Items.FirstOrDefault(s => s.SessionId == sessionId);
+    }
+
+    public ISshClientWrapper? GetClient(Guid sessionId)
+    {
+        _clients.TryGetValue(sessionId, out var client);
+        return client;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        var clientEntries = _clients.ToArray();
+        _clients.Clear();
+
+        foreach (var (sessionId, client) in clientEntries)
+        {
+            try
+            {
+                if (client.IsConnected)
+                {
+                    await Task.Run(() => client.Disconnect()).ConfigureAwait(false);
+                }
+
+                client.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Error disposing SSH client for session {SessionId}", sessionId);
+            }
+        }
+
+        _sessions.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

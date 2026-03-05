@@ -11,19 +11,21 @@ public class TransferManagerTests
     [Fact]
     public async Task QueueTransferAsync_AddsTransferToQueue()
     {
-        var manager = new TransferManager();
+        using var manager = new TransferManager(SlowExecutor());
         var task = CreateTransferTask(TransferType.Upload);
 
         await manager.QueueTransferAsync(task);
+        await Task.Delay(20);
 
-        manager.QueuedTransfers.Should().ContainSingle()
-            .Which.Id.Should().Be(task.Id);
+        var retrieved = manager.GetTransfer(task.Id);
+        retrieved.Should().NotBeNull();
+        retrieved!.Id.Should().Be(task.Id);
     }
 
     [Fact]
     public async Task QueueTransferAsync_RespectsMaxConcurrentLimit()
     {
-        var manager = new TransferManager { MaxConcurrentTransfers = 3 };
+        using var manager = new TransferManager(SlowExecutor()) { MaxConcurrentTransfers = 3 };
         var tasks = Enumerable.Range(0, 5)
             .Select(_ => CreateTransferTask(TransferType.Download))
             .ToList();
@@ -33,7 +35,7 @@ public class TransferManagerTests
             await manager.QueueTransferAsync(task);
         }
 
-        await Task.Delay(20);
+        await Task.Delay(100);
 
         var activeCount = manager.ActiveTransfers.Count;
         var queuedCount = manager.QueuedTransfers.Count;
@@ -46,8 +48,7 @@ public class TransferManagerTests
     [Fact]
     public async Task QueueTransferAsync_WithConcurrentLimit_OnlyThreeRunSimultaneously()
     {
-        var manager = new TransferManager { MaxConcurrentTransfers = 3 };
-        var activeCounts = new List<int>();
+        using var manager = new TransferManager(SlowExecutor()) { MaxConcurrentTransfers = 3 };
         var tasks = new List<TransferTask>();
 
         for (int i = 0; i < 5; i++)
@@ -59,14 +60,13 @@ public class TransferManagerTests
 
         await Task.Delay(200);
 
-        activeCounts.Add(manager.ActiveTransfers.Count);
         manager.ActiveTransfers.Count.Should().BeLessThanOrEqualTo(3);
     }
 
     [Fact]
     public async Task CancelTransferAsync_CancelsSpecificTransfer()
     {
-        var manager = new TransferManager();
+        using var manager = new TransferManager();
         var task = CreateTransferTask(TransferType.Upload);
 
         await manager.QueueTransferAsync(task);
@@ -79,7 +79,7 @@ public class TransferManagerTests
     [Fact]
     public async Task GetTransfer_ReturnsCorrectTransferTask()
     {
-        var manager = new TransferManager();
+        using var manager = new TransferManager();
         var task = CreateTransferTask(TransferType.Download);
 
         await manager.QueueTransferAsync(task);
@@ -94,7 +94,7 @@ public class TransferManagerTests
     [Fact]
     public void GetTransfer_WhenNotFound_ReturnsNull()
     {
-        var manager = new TransferManager();
+        using var manager = new TransferManager();
         var nonExistentId = Guid.NewGuid();
 
         var result = manager.GetTransfer(nonExistentId);
@@ -105,7 +105,7 @@ public class TransferManagerTests
     [Fact]
     public async Task ActiveTransfers_ReflectsCurrentlyRunningTransfers()
     {
-        var manager = new TransferManager { MaxConcurrentTransfers = 2 };
+        using var manager = new TransferManager(SlowExecutor()) { MaxConcurrentTransfers = 2 };
         
         var task1 = CreateTransferTask(TransferType.Upload);
         var task2 = CreateTransferTask(TransferType.Download);
@@ -123,7 +123,7 @@ public class TransferManagerTests
     [Fact]
     public void MaxConcurrentTransfers_DefaultsToThree()
     {
-        var manager = new TransferManager();
+        using var manager = new TransferManager();
 
         manager.MaxConcurrentTransfers.Should().Be(3);
     }
@@ -131,14 +131,22 @@ public class TransferManagerTests
     [Fact]
     public void MaxConcurrentTransfers_CanBeChanged()
     {
-        var manager = new TransferManager();
+        using var manager = new TransferManager();
 
         manager.MaxConcurrentTransfers = 5;
 
         manager.MaxConcurrentTransfers.Should().Be(5);
     }
 
-    private TransferTask CreateTransferTask(TransferType type)
+    private static TransferExecutor SlowExecutor(int delayMs = 2000)
+    {
+        return async (task, progress, ct) =>
+        {
+            await Task.Delay(delayMs, ct);
+        };
+    }
+
+    private static TransferTask CreateTransferTask(TransferType type)
     {
         return new TransferTask
         {

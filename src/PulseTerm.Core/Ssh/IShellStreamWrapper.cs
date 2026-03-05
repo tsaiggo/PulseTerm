@@ -3,6 +3,7 @@ namespace PulseTerm.Core.Ssh;
 public interface IShellStreamWrapper : IDisposable
 {
     bool DataAvailable { get; }
+    bool CanRead { get; }
     bool CanWrite { get; }
 
     string? Expect(string regex, TimeSpan timeout);

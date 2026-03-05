@@ -3,7 +3,7 @@ using PulseTerm.Core.Models;
 
 namespace PulseTerm.Core.Tunnels;
 
-public interface ITunnelService
+public interface ITunnelService : IAsyncDisposable
 {
     IObservableList<TunnelInfo> GetActiveTunnels(Guid sessionId);
     Task<TunnelInfo> CreateLocalForwardAsync(Guid sessionId, TunnelConfig config, CancellationToken cancellationToken = default);

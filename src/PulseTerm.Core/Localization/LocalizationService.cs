@@ -19,7 +19,11 @@ public class LocalizationService : ILocalizationService
             var value = _resourceManager.GetString(key, CultureInfo.CurrentUICulture);
             return value ?? key;
         }
-        catch
+        catch (MissingManifestResourceException)
+        {
+            return key;
+        }
+        catch (MissingSatelliteAssemblyException)
         {
             return key;
         }
@@ -29,6 +33,7 @@ public class LocalizationService : ILocalizationService
     
     public void SetLanguage(string language)
     {
+        ArgumentNullException.ThrowIfNull(language);
         var culture = new CultureInfo(language);
         CultureInfo.CurrentUICulture = culture;
         CultureInfo.CurrentCulture = culture;

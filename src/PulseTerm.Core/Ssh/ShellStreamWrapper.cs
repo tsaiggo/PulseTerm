@@ -13,6 +13,8 @@ public class ShellStreamWrapper : IShellStreamWrapper
 
     public bool DataAvailable => _stream.DataAvailable;
 
+    public bool CanRead => _stream.CanRead;
+
     public bool CanWrite => _stream.CanWrite;
 
     public string? Expect(string regex, TimeSpan timeout)

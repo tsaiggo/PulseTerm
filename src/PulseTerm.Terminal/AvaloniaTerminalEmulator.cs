@@ -1,3 +1,5 @@
+using System;
+using System.Text;
 using Avalonia.Controls;
 using AvaloniaTerminal;
 
@@ -5,8 +7,12 @@ namespace PulseTerm.Terminal;
 
 public class AvaloniaTerminalEmulator : ITerminalEmulator
 {
+    private const int DefaultCharWidth = 10;
+    private const int DefaultCharHeight = 20;
+
     private readonly TerminalControl _terminalControl;
     private readonly TerminalControlModel _model;
+    private bool _disposed;
 
     public AvaloniaTerminalEmulator()
     {
@@ -34,25 +40,23 @@ public class AvaloniaTerminalEmulator : ITerminalEmulator
         if (textSize.Width > 0 && textSize.Height > 0)
         {
             _model.Resize(
-                cols * 10,
-                rows * 20,
-                10,  
-                20   
+                cols * DefaultCharWidth,
+                rows * DefaultCharHeight,
+                DefaultCharWidth,
+                DefaultCharHeight
             );
         }
     }
 
     public string GetBufferLine(int row)
     {
-        var line = string.Empty;
+        var sb = new StringBuilder(_model.Terminal.Cols);
         for (int col = 0; col < _model.Terminal.Cols; col++)
         {
             if (_model.ConsoleText.TryGetValue((col, row), out var textObj))
-            {
-                line += textObj.Text;
-            }
+                sb.Append(textObj.Text);
         }
-        return line.TrimEnd();
+        return sb.ToString().TrimEnd();
     }
 
     public int CursorRow => _model.Terminal.Buffer.Y;
@@ -66,9 +70,13 @@ public class AvaloniaTerminalEmulator : ITerminalEmulator
     {
         UserInput?.Invoke(data);
     }
-    
-    internal void TriggerUserInput(byte[] data)
+
+    public void Dispose()
     {
-        OnUserInput(data);
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        _model.UserInput -= OnUserInput;
     }
 }

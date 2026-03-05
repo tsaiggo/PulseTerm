@@ -10,16 +10,17 @@ public class SshTerminalBridge : IDisposable
 {
     private readonly ITerminalEmulator _terminal;
     private readonly IShellStreamWrapper _shellStream;
-    private readonly Utf8StreamDecoder _decoder;
     private readonly CancellationTokenSource _cts;
     private Task? _readTask;
-    private bool _disposed;
+    private volatile bool _disposed;
+    private int _started;
+
+    public event Action<Exception>? Error;
 
     public SshTerminalBridge(ITerminalEmulator terminal, IShellStreamWrapper shellStream)
     {
         _terminal = terminal ?? throw new ArgumentNullException(nameof(terminal));
         _shellStream = shellStream ?? throw new ArgumentNullException(nameof(shellStream));
-        _decoder = new Utf8StreamDecoder();
         _cts = new CancellationTokenSource();
 
         _terminal.UserInput += OnUserInput;
@@ -27,7 +28,7 @@ public class SshTerminalBridge : IDisposable
 
     public void Start()
     {
-        if (_readTask != null)
+        if (Interlocked.CompareExchange(ref _started, 1, 0) != 0)
             throw new InvalidOperationException("Bridge already started");
 
         _readTask = Task.Run(ReadLoopAsync);
@@ -39,9 +40,9 @@ public class SshTerminalBridge : IDisposable
 
         try
         {
-            while (!_cts.Token.IsCancellationRequested && _shellStream.CanWrite)
+            while (!_cts.Token.IsCancellationRequested && _shellStream.CanRead)
             {
-                var bytesRead = await _shellStream.ReadAsync(buffer, 0, buffer.Length, _cts.Token);
+                var bytesRead = await _shellStream.ReadAsync(buffer, 0, buffer.Length, _cts.Token).ConfigureAwait(false);
 
                 if (bytesRead == 0)
                     break;
@@ -57,9 +58,15 @@ public class SshTerminalBridge : IDisposable
         }
         catch (OperationCanceledException)
         {
+            // Expected during shutdown — not an error
         }
-        catch (Exception)
+        catch (ObjectDisposedException)
         {
+            // Stream disposed during shutdown — not an error
+        }
+        catch (Exception ex)
+        {
+            Error?.Invoke(ex);
         }
     }
 
@@ -68,12 +75,23 @@ public class SshTerminalBridge : IDisposable
         if (_disposed || !_shellStream.CanWrite)
             return;
 
+        // Fire-and-forget with error handling — this is an event handler so async void is acceptable
+        _ = WriteUserInputAsync(data);
+    }
+
+    private async Task WriteUserInputAsync(byte[] data)
+    {
         try
         {
-            _shellStream.WriteAsync(data, 0, data.Length, CancellationToken.None).Wait();
+            await _shellStream.WriteAsync(data, 0, data.Length, CancellationToken.None).ConfigureAwait(false);
         }
-        catch
+        catch (ObjectDisposedException)
         {
+            // Stream disposed — expected during teardown
+        }
+        catch (Exception ex)
+        {
+            Error?.Invoke(ex);
         }
     }
 
@@ -88,8 +106,16 @@ public class SshTerminalBridge : IDisposable
 
         _cts.Cancel();
 
-        _readTask?.Wait(TimeSpan.FromSeconds(2));
+        try
+        {
+            _readTask?.Wait(TimeSpan.FromSeconds(2));
+        }
+        catch (AggregateException)
+        {
+            // Swallow faults from read task during dispose
+        }
 
         _cts.Dispose();
+        _shellStream.Dispose();
     }
 }
