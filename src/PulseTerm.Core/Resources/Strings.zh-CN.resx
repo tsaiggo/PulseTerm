@@ -138,6 +138,20 @@
     <value>延迟</value>
   </data>
   
+  <!-- Session Tree -->
+  <data name="Sessions" xml:space="preserve">
+    <value>会话</value>
+  </data>
+  <data name="NoSavedSessions" xml:space="preserve">
+    <value>没有保存的会话</value>
+  </data>
+  <data name="MoveToGroup" xml:space="preserve">
+    <value>移动到分组</value>
+  </data>
+  <data name="ClearAll" xml:space="preserve">
+    <value>全部清除</value>
+  </data>
+  
   <!-- General (9) -->
   <data name="Connect" xml:space="preserve">
     <value>连接</value>
@@ -205,5 +219,49 @@
   </data>
   <data name="TrustThisHost" xml:space="preserve">
     <value>信任此主机</value>
+  </data>
+  
+  <!-- Settings Dialog -->
+  <data name="TestConnection" xml:space="preserve">
+    <value>测试连接</value>
+  </data>
+  <data name="BrowseKeyFile" xml:space="preserve">
+    <value>浏览...</value>
+  </data>
+  <data name="ConnectionProfile" xml:space="preserve">
+    <value>连接配置</value>
+  </data>
+  <data name="AuthMethodLabel" xml:space="preserve">
+    <value>认证方式</value>
+  </data>
+  <data name="DefaultPort" xml:space="preserve">
+    <value>默认端口</value>
+  </data>
+  <data name="HostKeyChanged" xml:space="preserve">
+    <value>警告：主机密钥已更改！</value>
+  </data>
+  <data name="HostKeyUnknown" xml:space="preserve">
+    <value>首次连接此主机</value>
+  </data>
+  <data name="Fingerprint" xml:space="preserve">
+    <value>指纹</value>
+  </data>
+  <data name="KeyType" xml:space="preserve">
+    <value>密钥类型</value>
+  </data>
+  <data name="Trust" xml:space="preserve">
+    <value>信任</value>
+  </data>
+  <data name="Reject" xml:space="preserve">
+    <value>拒绝</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>名称</value>
+  </data>
+  <data name="Group" xml:space="preserve">
+    <value>分组</value>
+  </data>
+  <data name="Passphrase" xml:space="preserve">
+    <value>密码短语</value>
   </data>
 </root>

@@ -51,6 +51,11 @@ public static class Strings
     public static string Disconnected => ResourceManager.GetString(nameof(Disconnected), CultureInfo.CurrentUICulture) ?? nameof(Disconnected);
     public static string Latency => ResourceManager.GetString(nameof(Latency), CultureInfo.CurrentUICulture) ?? nameof(Latency);
     
+    public static string Sessions => ResourceManager.GetString(nameof(Sessions), CultureInfo.CurrentUICulture) ?? nameof(Sessions);
+    public static string NoSavedSessions => ResourceManager.GetString(nameof(NoSavedSessions), CultureInfo.CurrentUICulture) ?? nameof(NoSavedSessions);
+    public static string MoveToGroup => ResourceManager.GetString(nameof(MoveToGroup), CultureInfo.CurrentUICulture) ?? nameof(MoveToGroup);
+    public static string ClearAll => ResourceManager.GetString(nameof(ClearAll), CultureInfo.CurrentUICulture) ?? nameof(ClearAll);
+    
     public static string Connect => ResourceManager.GetString(nameof(Connect), CultureInfo.CurrentUICulture) ?? nameof(Connect);
     public static string Disconnect => ResourceManager.GetString(nameof(Disconnect), CultureInfo.CurrentUICulture) ?? nameof(Disconnect);
     public static string Save => ResourceManager.GetString(nameof(Save), CultureInfo.CurrentUICulture) ?? nameof(Save);
@@ -74,4 +79,19 @@ public static class Strings
     public static string Port => ResourceManager.GetString(nameof(Port), CultureInfo.CurrentUICulture) ?? nameof(Port);
     public static string HostKeyVerification => ResourceManager.GetString(nameof(HostKeyVerification), CultureInfo.CurrentUICulture) ?? nameof(HostKeyVerification);
     public static string TrustThisHost => ResourceManager.GetString(nameof(TrustThisHost), CultureInfo.CurrentUICulture) ?? nameof(TrustThisHost);
+    
+    public static string TestConnection => ResourceManager.GetString(nameof(TestConnection), CultureInfo.CurrentUICulture) ?? nameof(TestConnection);
+    public static string BrowseKeyFile => ResourceManager.GetString(nameof(BrowseKeyFile), CultureInfo.CurrentUICulture) ?? nameof(BrowseKeyFile);
+    public static string ConnectionProfile => ResourceManager.GetString(nameof(ConnectionProfile), CultureInfo.CurrentUICulture) ?? nameof(ConnectionProfile);
+    public static string AuthMethodLabel => ResourceManager.GetString(nameof(AuthMethodLabel), CultureInfo.CurrentUICulture) ?? nameof(AuthMethodLabel);
+    public static string DefaultPort => ResourceManager.GetString(nameof(DefaultPort), CultureInfo.CurrentUICulture) ?? nameof(DefaultPort);
+    public static string HostKeyChanged => ResourceManager.GetString(nameof(HostKeyChanged), CultureInfo.CurrentUICulture) ?? nameof(HostKeyChanged);
+    public static string HostKeyUnknown => ResourceManager.GetString(nameof(HostKeyUnknown), CultureInfo.CurrentUICulture) ?? nameof(HostKeyUnknown);
+    public static string Fingerprint => ResourceManager.GetString(nameof(Fingerprint), CultureInfo.CurrentUICulture) ?? nameof(Fingerprint);
+    public static string KeyType => ResourceManager.GetString(nameof(KeyType), CultureInfo.CurrentUICulture) ?? nameof(KeyType);
+    public static string Trust => ResourceManager.GetString(nameof(Trust), CultureInfo.CurrentUICulture) ?? nameof(Trust);
+    public static string Reject => ResourceManager.GetString(nameof(Reject), CultureInfo.CurrentUICulture) ?? nameof(Reject);
+    public static string Name => ResourceManager.GetString(nameof(Name), CultureInfo.CurrentUICulture) ?? nameof(Name);
+    public static string Group => ResourceManager.GetString(nameof(Group), CultureInfo.CurrentUICulture) ?? nameof(Group);
+    public static string Passphrase => ResourceManager.GetString(nameof(Passphrase), CultureInfo.CurrentUICulture) ?? nameof(Passphrase);
 }

@@ -138,6 +138,20 @@
     <value>Latency</value>
   </data>
   
+  <!-- Session Tree -->
+  <data name="Sessions" xml:space="preserve">
+    <value>Sessions</value>
+  </data>
+  <data name="NoSavedSessions" xml:space="preserve">
+    <value>No saved sessions</value>
+  </data>
+  <data name="MoveToGroup" xml:space="preserve">
+    <value>Move to Group</value>
+  </data>
+  <data name="ClearAll" xml:space="preserve">
+    <value>Clear All</value>
+  </data>
+  
   <!-- General (9) -->
   <data name="Connect" xml:space="preserve">
     <value>Connect</value>
@@ -205,5 +219,49 @@
   </data>
   <data name="TrustThisHost" xml:space="preserve">
     <value>Trust This Host</value>
+  </data>
+  
+  <!-- Settings Dialog -->
+  <data name="TestConnection" xml:space="preserve">
+    <value>Test Connection</value>
+  </data>
+  <data name="BrowseKeyFile" xml:space="preserve">
+    <value>Browse...</value>
+  </data>
+  <data name="ConnectionProfile" xml:space="preserve">
+    <value>Connection Profile</value>
+  </data>
+  <data name="AuthMethodLabel" xml:space="preserve">
+    <value>Authentication</value>
+  </data>
+  <data name="DefaultPort" xml:space="preserve">
+    <value>Default Port</value>
+  </data>
+  <data name="HostKeyChanged" xml:space="preserve">
+    <value>WARNING: Host key has changed!</value>
+  </data>
+  <data name="HostKeyUnknown" xml:space="preserve">
+    <value>First connection to this host</value>
+  </data>
+  <data name="Fingerprint" xml:space="preserve">
+    <value>Fingerprint</value>
+  </data>
+  <data name="KeyType" xml:space="preserve">
+    <value>Key Type</value>
+  </data>
+  <data name="Trust" xml:space="preserve">
+    <value>Trust</value>
+  </data>
+  <data name="Reject" xml:space="preserve">
+    <value>Reject</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Group" xml:space="preserve">
+    <value>Group</value>
+  </data>
+  <data name="Passphrase" xml:space="preserve">
+    <value>Passphrase</value>
   </data>
 </root>
