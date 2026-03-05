@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
+using PulseTerm.App.ViewModels;
+using PulseTerm.App.Views;
 using PulseTerm.Core.Services;
 
 namespace PulseTerm.App;
@@ -22,7 +24,11 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow();
+            var viewModel = new MainWindowViewModel();
+            desktop.MainWindow = new MainWindow
+            {
+                DataContext = viewModel
+            };
         }
 
         base.OnFrameworkInitializationCompleted();

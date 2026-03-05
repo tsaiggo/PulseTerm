@@ -13,6 +13,17 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   
+  <!-- App Shell -->
+  <data name="AppName" xml:space="preserve">
+    <value>PulseTerm</value>
+  </data>
+  <data name="Ready" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="QuickConnectPlaceholder" xml:space="preserve">
+    <value>user@host:port</value>
+  </data>
+  
   <!-- Sidebar (5) -->
   <data name="QuickConnect" xml:space="preserve">
     <value>Quick Connect</value>

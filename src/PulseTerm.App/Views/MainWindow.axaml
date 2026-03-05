@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:PulseTerm.App.ViewModels"
+        xmlns:views="using:PulseTerm.App.Views"
+        xmlns:res="clr-namespace:PulseTerm.Core.Resources;assembly=PulseTerm.Core"
+        mc:Ignorable="d" d:DesignWidth="1440" d:DesignHeight="900"
+        x:Class="PulseTerm.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{x:Static res:Strings.AppName}"
+        Width="1440" Height="900"
+        MinWidth="800" MinHeight="500"
+        Background="{DynamicResource PulseBgPage}"
+        WindowStartupLocation="CenterScreen">
+
+  <Grid RowDefinitions="*,Auto">
+
+    <!-- Row 0: Content area (sidebar + main) -->
+    <Grid Grid.Row="0" ColumnDefinitions="260,Auto,*">
+
+      <!-- Sidebar -->
+      <views:SidebarView Grid.Column="0" DataContext="{Binding Sidebar}" />
+
+      <!-- Sidebar border -->
+      <Border Grid.Column="1"
+              Width="1"
+              Background="{DynamicResource PulseBorderPrimary}" />
+
+      <!-- Main area (tab bar + terminal) -->
+      <Grid Grid.Column="2" RowDefinitions="36,*">
+
+        <!-- Tab bar -->
+        <views:TabBarView Grid.Row="0" DataContext="{Binding TabBar}" />
+
+        <!-- Terminal area placeholder -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource PulseBgPage}">
+          <TextBlock Text="{x:Static res:Strings.AppName}"
+                     Foreground="{DynamicResource PulseTextMuted}"
+                     FontSize="24"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     Opacity="0.3" />
+        </Border>
+
+      </Grid>
+    </Grid>
+
+    <!-- Row 1: Status bar -->
+    <Border Grid.Row="1"
+            Height="24"
+            Background="{DynamicResource PulseBgSurface}"
+            BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource PulseBorderSecondary}"
+            Padding="12,0"
+            DataContext="{Binding StatusBar}">
+      <Border.DataTemplates>
+        <DataTemplate DataType="vm:StatusBarViewModel">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding StatusText}"
+                       Foreground="{DynamicResource PulseTextSecondary}"
+                       FontSize="11"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2"
+                       Text="{Binding ConnectionInfo}"
+                       Foreground="{DynamicResource PulseTextTertiary}"
+                       FontSize="11"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </DataTemplate>
+      </Border.DataTemplates>
+      <ContentControl Content="{Binding}" />
+    </Border>
+
+  </Grid>
+</Window>

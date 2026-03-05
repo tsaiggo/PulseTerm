@@ -835,3 +835,41 @@ _terminal.UserInput += (data) => {
 </Border>
 ```
 
+## [2026-03-05] Task 10: Core UI Shell — MainWindow + Sidebar + Tab Bar
+
+### Test Results
+- **Tests Created**: 8 (2 MainWindowViewModel + 6 TabBarViewModel)
+- **Tests Passed**: 8/8 (100%) + 1 existing SmokeTest = 9 App tests
+- **Total Solution Tests**: 136 (98 Core + 9 App + 29 Terminal) — all pass
+- **Build**: `dotnet build src/PulseTerm.slnx --warnaserror` → 0 warnings, 0 errors
+
+### Avalonia 11.x AXAML Pitfalls
+- **TextTransform**: Does NOT exist in Avalonia 11.x. CSS-like `TextTransform="Uppercase"` is NOT available on TextBlock.
+- **ImplicitUsings**: PulseTerm.App.csproj does NOT have `<ImplicitUsings>enable</ImplicitUsings>`. Must add explicit `using System;` for `Guid`, `Math`, etc.
+- **CompiledBindings**: `AvaloniaUseCompiledBindingsByDefault=true` is enabled — all views MUST have `x:DataType` for compiled binding support.
+
+### ReactiveUI ViewModel Pattern (No Fody)
+- Use manual `this.RaiseAndSetIfChanged` pattern — ReactiveUI.Fody NOT configured
+- `ReactiveCommand.Create()` for synchronous commands
+- Test invocation: `.Execute().Subscribe()` works synchronously, no scheduler override needed
+
+### View-ViewModel Wiring
+- `App.axaml.cs`: Create `MainWindowViewModel`, inject as `DataContext`
+- Child views receive DataContext via binding: `DataContext="{Binding Sidebar}"`
+- StatusBar uses `DataTemplate` + `ContentControl` pattern for inline rendering
+
+### Localization in AXAML
+- Pattern: `xmlns:res="clr-namespace:PulseTerm.Core.Resources;assembly=PulseTerm.Core"` + `{x:Static res:Strings.XXX}`
+- Added 3 new strings: `AppName`, `Ready`, `QuickConnectPlaceholder`
+
+### Layout Structure
+- MainWindow: Grid 2 rows (content + 24px status bar)
+- Content: Grid 3 cols (260px sidebar + 1px border + * terminal area)
+- Terminal area: Grid 2 rows (36px tab bar + * content)
+- Sidebar: DockPanel (footer bottom, ScrollViewer content)
+- Tab bar: DockPanel ("+" right, horizontal ItemsControl)
+
+### Theme Tokens
+- ALL colors use `{DynamicResource PulseXxx}` — zero hardcoded hex in Views/
+- PathIcon SVG data for icons (bell, gear, close, plus, arrow)
+

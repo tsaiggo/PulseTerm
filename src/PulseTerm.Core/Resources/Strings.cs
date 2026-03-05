@@ -8,6 +8,9 @@ public static class Strings
     private static readonly ResourceManager ResourceManager = 
         new ResourceManager("PulseTerm.Core.Resources.Strings", typeof(Strings).Assembly);
     
+    public static string AppName => ResourceManager.GetString(nameof(AppName), CultureInfo.CurrentUICulture) ?? nameof(AppName);
+    public static string Ready => ResourceManager.GetString(nameof(Ready), CultureInfo.CurrentUICulture) ?? nameof(Ready);
+    public static string QuickConnectPlaceholder => ResourceManager.GetString(nameof(QuickConnectPlaceholder), CultureInfo.CurrentUICulture) ?? nameof(QuickConnectPlaceholder);
     public static string QuickConnect => ResourceManager.GetString(nameof(QuickConnect), CultureInfo.CurrentUICulture) ?? nameof(QuickConnect);
     public static string RecentConnections => ResourceManager.GetString(nameof(RecentConnections), CultureInfo.CurrentUICulture) ?? nameof(RecentConnections);
     public static string ServerGroups => ResourceManager.GetString(nameof(ServerGroups), CultureInfo.CurrentUICulture) ?? nameof(ServerGroups);
