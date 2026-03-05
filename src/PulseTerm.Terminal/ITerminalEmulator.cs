@@ -57,4 +57,10 @@ public interface ITerminalEmulator : IDisposable
     /// Current number of rows
     /// </summary>
     int Rows { get; }
+    
+    ScrollbackBuffer ScrollbackBuffer { get; }
+    
+    int TotalLines { get; }
+    
+    int ViewportRow { get; }
 }

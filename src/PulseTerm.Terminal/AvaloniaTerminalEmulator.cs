@@ -25,6 +25,8 @@ public class AvaloniaTerminalEmulator : ITerminalEmulator
             FontFamily = "Cascadia Mono",
             FontSize = 14
         };
+        
+        ScrollbackBuffer = new ScrollbackBuffer(ScrollbackLines);
     }
 
     public event Action<byte[]>? UserInput;
@@ -65,6 +67,9 @@ public class AvaloniaTerminalEmulator : ITerminalEmulator
     public Control Control => _terminalControl;
     public int Columns => _model.Terminal.Cols;
     public int Rows => _model.Terminal.Rows;
+    public ScrollbackBuffer ScrollbackBuffer { get; }
+    public int TotalLines => ScrollbackBuffer.TotalLines;
+    public int ViewportRow => ScrollbackBuffer.ViewportRow;
 
     private void OnUserInput(byte[] data)
     {
