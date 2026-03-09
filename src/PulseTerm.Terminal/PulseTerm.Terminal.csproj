@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.8" />
+    <PackageReference Include="AvaloniaTerminal" Version="1.0.0-alpha.7" />
+    <PackageReference Include="ReactiveUI" Version="20.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PulseTerm.Core\PulseTerm.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PulseTerm.Terminal.Tests" />
+  </ItemGroup>
+
+</Project>
