@@ -1,11 +1,11 @@
 using Avalonia;
-using Avalonia.ReactiveUI;
 using System;
+using ReactiveUI.Avalonia;
 using Velopack;
 
 namespace PulseTerm.App;
 
-class Program
+internal static class Program
 {
     [STAThread]
     public static void Main(string[] args)
@@ -20,5 +20,5 @@ class Program
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace()
-            .UseReactiveUI();
+            .UseReactiveUI(builder => { });
 }

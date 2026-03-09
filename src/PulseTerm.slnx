@@ -1,7 +1,9 @@
 <Solution>
-  <Project Path="../tests/PulseTerm.App.Tests/PulseTerm.App.Tests.csproj" />
-  <Project Path="../tests/PulseTerm.Core.Tests/PulseTerm.Core.Tests.csproj" />
-  <Project Path="../tests/PulseTerm.Terminal.Tests/PulseTerm.Terminal.Tests.csproj" />
+  <Folder Name="/test/">
+    <Project Path="../tests/PulseTerm.App.Tests/PulseTerm.App.Tests.csproj" />
+    <Project Path="../tests/PulseTerm.Core.Tests/PulseTerm.Core.Tests.csproj" />
+    <Project Path="../tests/PulseTerm.Terminal.Tests/PulseTerm.Terminal.Tests.csproj" />
+  </Folder>
   <Project Path="PulseTerm.App/PulseTerm.App.csproj" />
   <Project Path="PulseTerm.Core/PulseTerm.Core.csproj" />
   <Project Path="PulseTerm.Terminal/PulseTerm.Terminal.csproj" />
