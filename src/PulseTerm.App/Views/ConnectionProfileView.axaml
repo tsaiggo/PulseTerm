@@ -105,6 +105,24 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="16">
 
+        <!-- Security Warning -->
+        <Border Background="#FFF4E6"
+                BorderBrush="#FFB74D"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12">
+          <StackPanel Spacing="6">
+            <TextBlock Text="{x:Static res:Strings.SecurityWarning}"
+                       Foreground="#E65100"
+                       FontWeight="SemiBold"
+                       FontSize="13" />
+            <TextBlock Text="{x:Static res:Strings.PasswordStorageWarning}"
+                       Foreground="#5D4037"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
         <!-- Name -->
         <StackPanel>
           <TextBlock Classes="field-label" Text="{x:Static res:Strings.Name}" />

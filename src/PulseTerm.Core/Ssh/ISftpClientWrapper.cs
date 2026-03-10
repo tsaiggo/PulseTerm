@@ -2,6 +2,10 @@ using Renci.SshNet.Sftp;
 
 namespace PulseTerm.Core.Ssh;
 
+/// <summary>
+/// Wrapper interface for SSH.NET's SftpClient.
+/// See <see cref="ISshClientWrapper"/> for the rationale behind maintaining wrapper interfaces.
+/// </summary>
 public interface ISftpClientWrapper : IDisposable
 {
     bool IsConnected { get; }

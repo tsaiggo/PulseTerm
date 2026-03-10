@@ -100,4 +100,6 @@ public static class Strings
     public static string Name => ResourceManager.GetString(nameof(Name), CultureInfo.CurrentUICulture) ?? nameof(Name);
     public static string Group => ResourceManager.GetString(nameof(Group), CultureInfo.CurrentUICulture) ?? nameof(Group);
     public static string Passphrase => ResourceManager.GetString(nameof(Passphrase), CultureInfo.CurrentUICulture) ?? nameof(Passphrase);
+    public static string SecurityWarning => ResourceManager.GetString(nameof(SecurityWarning), CultureInfo.CurrentUICulture) ?? nameof(SecurityWarning);
+    public static string PasswordStorageWarning => ResourceManager.GetString(nameof(PasswordStorageWarning), CultureInfo.CurrentUICulture) ?? nameof(PasswordStorageWarning);
 }
