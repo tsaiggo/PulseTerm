@@ -9,6 +9,7 @@ public class TabViewModel : ReactiveObject
 {
     private string _title;
     private SessionStatus _connectionStatus;
+    private bool _isActive;
 
     public TabViewModel()
     {
@@ -28,5 +29,11 @@ public class TabViewModel : ReactiveObject
     {
         get => _connectionStatus;
         set => this.RaiseAndSetIfChanged(ref _connectionStatus, value);
+    }
+
+    public bool IsActive
+    {
+        get => _isActive;
+        set => this.RaiseAndSetIfChanged(ref _isActive, value);
     }
 }

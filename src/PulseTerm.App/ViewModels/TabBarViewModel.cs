@@ -16,6 +16,7 @@ public class TabBarViewModel : ReactiveObject
 
         AddTabCommand = ReactiveCommand.Create(AddTab);
         CloseTabCommand = ReactiveCommand.Create<TabViewModel>(CloseTab);
+        SelectTabCommand = ReactiveCommand.Create<TabViewModel>(tab => ActiveTab = tab);
         CloseActiveTabCommand = ReactiveCommand.Create(CloseActiveTab);
         NextTabCommand = ReactiveCommand.Create(NextTab);
         PreviousTabCommand = ReactiveCommand.Create(PreviousTab);
@@ -26,11 +27,19 @@ public class TabBarViewModel : ReactiveObject
     public TabViewModel? ActiveTab
     {
         get => _activeTab;
-        set => this.RaiseAndSetIfChanged(ref _activeTab, value);
+        set
+        {
+            if (_activeTab != null)
+                _activeTab.IsActive = false;
+            this.RaiseAndSetIfChanged(ref _activeTab, value);
+            if (_activeTab != null)
+                _activeTab.IsActive = true;
+        }
     }
 
     public ReactiveCommand<Unit, Unit> AddTabCommand { get; }
     public ReactiveCommand<TabViewModel, Unit> CloseTabCommand { get; }
+    public ReactiveCommand<TabViewModel, Unit> SelectTabCommand { get; }
     public ReactiveCommand<Unit, Unit> CloseActiveTabCommand { get; }
     public ReactiveCommand<Unit, Unit> NextTabCommand { get; }
     public ReactiveCommand<Unit, Unit> PreviousTabCommand { get; }
