@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
@@ -8,7 +9,7 @@ public class JsonDataStore
     private readonly Dictionary<string, SemaphoreSlim> _fileLocks = new();
     private readonly SemaphoreSlim _dictionaryLock = new(1, 1);
     private readonly ILogger<JsonDataStore>? _logger;
-    
+
     private readonly JsonSerializerOptions _options = new()
     {
         WriteIndented = true,
@@ -73,8 +74,13 @@ public class JsonDataStore
                         FileMode.Create,
                         FileAccess.Write,
                         FileShare.None);
-                        
+
                     await JsonSerializer.SerializeAsync(stream, data, _options, cancellationToken).ConfigureAwait(false);
+                    await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+                    // Set restrictive file permissions on Unix systems (owner read/write only)
+                    SetSecureFilePermissions(filePath);
+
                     return;
                 }
                 catch (IOException) when (attempt < 2)
@@ -104,6 +110,29 @@ public class JsonDataStore
         finally
         {
             _dictionaryLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Sets restrictive file permissions on Unix systems (chmod 600 - owner read/write only).
+    /// On Windows, this operation is skipped as NTFS permissions are typically more restrictive by default.
+    /// </summary>
+    private void SetSecureFilePermissions(string filePath)
+    {
+        // Only apply chmod on Unix-like systems (Linux, macOS)
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            try
+            {
+                // Set file permissions to 600 (owner read/write only)
+                // This is equivalent to: chmod 600 <file>
+                File.SetUnixFileMode(filePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                _logger?.LogDebug("Set secure file permissions (600) for {FilePath}", filePath);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to set secure file permissions for {FilePath}", filePath);
+            }
         }
     }
 }

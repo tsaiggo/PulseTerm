@@ -282,4 +282,10 @@
   <data name="Passphrase" xml:space="preserve">
     <value>Passphrase</value>
   </data>
+  <data name="SecurityWarning" xml:space="preserve">
+    <value>⚠️ Security Notice</value>
+  </data>
+  <data name="PasswordStorageWarning" xml:space="preserve">
+    <value>Passwords and passphrases are currently stored in plain text on disk. Use private key authentication when possible for better security.</value>
+  </data>
 </root>

@@ -282,4 +282,10 @@
   <data name="Passphrase" xml:space="preserve">
     <value>密码短语</value>
   </data>
+  <data name="SecurityWarning" xml:space="preserve">
+    <value>⚠️ 安全提示</value>
+  </data>
+  <data name="PasswordStorageWarning" xml:space="preserve">
+    <value>密码和密钥短语当前以明文形式存储在磁盘上。为了更好的安全性，建议尽可能使用私钥认证。</value>
+  </data>
 </root>
